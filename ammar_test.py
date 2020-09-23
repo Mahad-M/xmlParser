@@ -18,7 +18,7 @@ if __name__ == '__main__':
         img_path = os.path.join(img_dir, img_file)
         npy_path = os.path.join(npy_dir, Path(img_file).stem + ".npy")
         img = cv2.imread(img_path)
-        all_boxes = np.load(npy_path, allow_pickle=True)
+        all_boxes = np.load(npy_path, allow_pickle=True).tolist()
         print()
         # all_boxes = para_boxes + table_boxes
         # all_texts = para_texts + table_texts

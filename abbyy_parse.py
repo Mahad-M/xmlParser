@@ -1,6 +1,5 @@
 import os
 import argparse
-from lxml import etree
 import numpy as np
 import cv2
 import pdf2image
@@ -27,8 +26,6 @@ if __name__ == '__main__':
             table_texts = [tt["rows"] for tt in tables]
             img = pdf2image.convert_from_path(pdf_path, size=(page["width"], page["height"]),
                                               first_page=page["page_number"], last_page=page["page_number"])
-            if xml_file == "01-protected-retirement-plan-customer-key-features.xml" and page["page_number"] == 2:
-                print()
             img = np.asarray(img[0])
             all_boxes = para_boxes + table_boxes
             all_texts = para_texts + table_texts
@@ -41,10 +38,8 @@ if __name__ == '__main__':
                 ordered_texts.append(all_texts[idx])
             if idx:
                 del idx
-            # if xml_file == "01-protected-retirement-plan-customer-key-features.xml":
             for ordered_box in ordered_boxes:
                 img_draw = draw_boxes(img, [ordered_box])
                 cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
                 # cv2.imshow('', img_draw)
                 cv2.waitKey()
-            # # cv2.imwrite("/tmp/" + xml_file.replace("xml", "png"), img_draw)
