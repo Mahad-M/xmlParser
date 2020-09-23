@@ -2,10 +2,12 @@ import os
 import numpy as np
 import json
 from lxml import etree
+from pathlib import Path
 if __name__ == '__main__':
     html_file = "/home/mahad/abbyy_dummy_dataset/html/font_styles.html"
     xml_file = "/home/mahad/abbyy_dummy_dataset/xml/font_styles.xml"
     css_file = "/home/mahad/abbyy_dummy_dataset/html/font_styles.css"
+    save_dir = "/home/mahad/abbyy_dummy_dataset/merged_xml"
 
     parser = etree.HTMLParser()
     html_tree = etree.parse(html_file, parser)
@@ -50,6 +52,7 @@ if __name__ == '__main__':
             elem.set("font", font_family_cum[j])
             elem.set("style", font_styles_cum[j])
             j += 1
-    xml_tree.write("/home/mahad/test.xml", pretty_print=True)
+    save_name = os.path.join(save_dir, Path(xml_file).name)
+    xml_tree.write(os.path.join(save_dir, Path(xml_file).name), pretty_print=True)
 
 
