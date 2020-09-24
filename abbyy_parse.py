@@ -14,6 +14,7 @@ if __name__ == '__main__':
     pdf_files = os.listdir(pdf_dir)
     xml_files = os.listdir(xml_dir)
     for xml_file in xml_files:
+        print(xml_file)
         xml_path = os.path.join(xml_dir, xml_file)
         pdf_path = os.path.join(pdf_dir, Path(xml_file).stem + ".pdf")
         xml_data = get_raw_data(xml_path)
@@ -38,8 +39,16 @@ if __name__ == '__main__':
                 ordered_texts.append(all_texts[idx])
             if idx:
                 del idx
-            for ordered_box in ordered_boxes:
-                img_draw = draw_boxes(img, [ordered_box])
-                cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
-                # cv2.imshow('', img_draw)
-                cv2.waitKey()
+            for i in range(0, len(ordered_boxes)):
+                if not isinstance(ordered_texts[i], list):
+                    img_draw = draw_boxes(img, [ordered_boxes[i]])
+                    cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
+                    cv2.waitKey()
+                else:
+                    for row in ordered_texts[i]:
+                        cells = np.array(row["boxes"])
+                        cells = cells[np.argsort(cells[:, 0])]
+                        for cell in cells:
+                            img_draw = draw_boxes(img, [cell])
+                            cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
+                            cv2.waitKey()

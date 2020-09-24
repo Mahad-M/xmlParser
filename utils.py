@@ -36,8 +36,6 @@ def get_raw_data(xml_file):
         tables = []
         height = int(page.attrib.get("height"))
         width = int(page.attrib.get("width"))
-        if page_num == 22:
-            print()
         for block in page:  # iterate over blocks
             complete_table = {"bbox": [], "rows": []}
             if block.attrib.get("blockType") == "Text":
@@ -80,22 +78,39 @@ def get_raw_data(xml_file):
                 for row in block:
                     row_cells = {"boxes": [], "texts": []}
                     for cell in row:
-                        for text in cell:
-                            for para in text:
-                                for line in para:
-                                    char_text = []
-                                    for formatting in line:
-                                        for charParams in formatting:
-                                            if charParams.text is not None:
-                                                char_text.append(charParams.text)
-                                        baseline = int(line.attrib.get("baseline"))
-                                        xmin = int(line.attrib.get("l"))  # - 35
-                                        ymin = int(line.attrib.get("t"))  # - 35
-                                        xmax = int(line.attrib.get("r"))  # + 35
-                                        ymax = int(line.attrib.get("b"))  # + 35
-                                        cell = [xmin, ymin, xmax, ymax]
-                                        row_cells["boxes"].append(cell)
-                                        row_cells["texts"].append("".join(char_text))
+                        cell_boxes = []
+                        cell_text = ""
+                        for elem in cell.iter():
+                            if elem.tag.count("line") > 0:
+                                cell_boxes.append([elem.attrib["l"], elem.attrib["t"], elem.attrib["r"],
+                                                   elem.attrib["b"]])
+                                for sub_elem in elem.iter():
+                                    if sub_elem.tag.count("charParams") > 0:
+                                        cell_text += sub_elem.text
+                        if cell_boxes == [] and cell_text == "":
+                            continue
+                        cell_boxes = np.array(cell_boxes).astype(np.float).astype(np.int)
+                        if cell_boxes.ndim == 1:
+                            cell_boxes = np.expand_dims(cell_boxes, axis=1)
+                        row_cells["boxes"].append([np.amin(cell_boxes[:, 0]), np.amin(cell_boxes[:, 1]),
+                                                   np.amax(cell_boxes[:, 2]), np.amax(cell_boxes[:, 3])])
+                        row_cells["texts"].append(cell_text)
+                        # for text in cell:
+                        #     for para in text:
+                        #         for line in para:
+                        #             char_text = []
+                        #             for formatting in line:
+                        #                 for charParams in formatting:
+                        #                     if charParams.text is not None:
+                        #                         char_text.append(charParams.text)
+                        #                 baseline = int(line.attrib.get("baseline"))
+                        #                 xmin = int(line.attrib.get("l"))  # - 35
+                        #                 ymin = int(line.attrib.get("t"))  # - 35
+                        #                 xmax = int(line.attrib.get("r"))  # + 35
+                        #                 ymax = int(line.attrib.get("b"))  # + 35
+                        #                 cell = [xmin, ymin, xmax, ymax]
+                        #                 row_cells["boxes"].append(cell)
+                        #                 row_cells["texts"].append("".join(char_text))
                     table_rows.append(row_cells)
                 print()
                 all_cells = []
@@ -278,37 +293,6 @@ def lies_under(bounds1, bounds2, eps=85):
         if (bounds2[0] >= bounds1[i, 0] - eps) and (bounds2[2] <= bounds1[i, 2] + eps):
             return i
     return -1
-
-
-# def merge_blocks(blocks, para_boxes):
-#     blocks = np.array(blocks)
-#     blocks = blocks[np.argsort(blocks[:, 1])]
-#     para_boxes = np.array(para_boxes)
-#     eps = 15
-#     n_cols = []
-#     for block in blocks:
-#         block_boxes = para_boxes[
-#             np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= block[0] - eps,
-#                                                          para_boxes[:, 1] >= block[1] - eps),
-#                                           para_boxes[:, 2] <= block[2] + eps),
-#                            para_boxes[:, 3] <= block[3] + eps)]
-#         n_cols.append(len(get_col_bounds(block_boxes)))
-#         to_merge = []
-#     for j in range(0, len(n_cols)):
-#         curr_boxes = para_boxes[np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j, 0] - eps,
-#                                 para_boxes[:, 1] >= blocks[j, 1] - eps), para_boxes[:, 2] <= blocks[j, 2] + eps),
-#                                 para_boxes[:, 3] <= blocks[j, 3] + eps)]
-#         next_boxes = para_boxes[np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j + 1, 0] - eps,
-#                                 para_boxes[:, 1] >= blocks[j + 1, 1] - eps), para_boxes[:, 2] <= blocks[j + 1, 2] + eps)
-#                                 , para_boxes[:, 3] <= blocks[j + 1, 3] + eps)]
-#         curr_bounds = get_col_bounds(curr_boxes)
-#         next_bounds = get_col_bounds(next_boxes)
-#         under_cols = []
-#         for next_bound in next_bounds:
-#             under_cols.append(lies_under(curr_bounds, next_bound))
-#         if -1 not in under_cols:
-#             ll = update_col_bounds(curr_bounds, next_bounds)
-#         print()
 
 
 def create_order(blocks, boxes):

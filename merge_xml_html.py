@@ -3,10 +3,11 @@ import numpy as np
 import json
 from lxml import etree
 from pathlib import Path
+import re
 if __name__ == '__main__':
-    html_file = "/home/mahad/abbyy_dummy_dataset/html/font_styles.html"
-    xml_file = "/home/mahad/abbyy_dummy_dataset/xml/font_styles.xml"
-    css_file = "/home/mahad/abbyy_dummy_dataset/html/font_styles.css"
+    html_file = "/home/mahad/abbyy_dummy_dataset/html/Table.html"
+    xml_file = "/home/mahad/abbyy_dummy_dataset/xml/Table.xml"
+    css_file = "/home/mahad/abbyy_dummy_dataset/html/Table.css"
     save_dir = "/home/mahad/abbyy_dummy_dataset/merged_xml"
 
     parser = etree.HTMLParser()
@@ -30,6 +31,30 @@ if __name__ == '__main__':
     xml_tree = etree.parse(xml_file)
     font_styles_cum = []
     font_family_cum = []
+    # for elem in xml_tree.iter():
+    #     if elem.tag == "par":
+    #         line_count = 0
+    #         for line in elem:
+    #             if line_count >= len(elem.getchildren()):
+    #                 for formatting in elem:
+    #                     pos = len(formatting.getchildren())
+    #                     c = etree.Element("charParams")
+    #                     c.text = " "
+    #                     formatting.insert(pos, c)
+    #             line_count += 1
+    # xml_tree.write(os.path.join(save_dir, Path(xml_file).name), pretty_print=True)
+    xml_str = ""
+    for elem in xml_tree.iter():
+        if elem.tag.count("charParams") > 0 and "charConfidence" in elem.attrib.keys():
+            xml_str += elem.text
+    print(len(html_str))
+    print(len(xml_str))
+    with open("/tmp/xml.txt", "wt") as file:
+        file.write(xml_str)
+        file.close()
+    with open("/tmp/html.txt", "wt") as file:
+        file.write(html_str)
+        file.close()
     for i in range(0, len(char_styles)):
         font_family = char_styles[i]["class"]
         n_chars = style_len[i]

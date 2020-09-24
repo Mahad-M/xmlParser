@@ -1,4 +1,5 @@
 from lxml import etree
+from utils import get_raw_data
 
 
 def retrieve_style_text(xml_file, style):
@@ -13,6 +14,5 @@ def retrieve_style_text(xml_file, style):
 
 
 if __name__ == '__main__':
-    xml_file = "/home/mahad/abbyy_dummy_dataset/merged_xml/font_styles.xml"
-    texts, locs = retrieve_style_text(xml_file, "bold,italic")
-    print()
+    xml_file = "/home/mahad/abbyy_dummy_dataset/xml/Original Doc_Alpha FDI Holdings Pte. Ltd. (1).xml"
+    results = get_raw_data(xml_file)
