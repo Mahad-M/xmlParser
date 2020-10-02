@@ -34,6 +34,7 @@ def get_raw_data(xml_file):
         para_boxes = []
         para_texts = []
         tables = []
+        n_lines = []
         height = int(page.attrib.get("height"))
         width = int(page.attrib.get("width"))
         for block in page:  # iterate over blocks
@@ -43,8 +44,10 @@ def get_raw_data(xml_file):
                     for para in text:  # iterate over paragraphs
                         para_box = []
                         para_text = []
+                        n_lines_para = 0
                         for line in para:  # iterate over lines
                             char_text = []
+                            n_lines_para += 1
                             for formatting in line:
                                 for charParams in formatting:  # iterating over characters
                                     if charParams.text is not None:
@@ -73,6 +76,7 @@ def get_raw_data(xml_file):
                         para_text_str = " ".join(para_text)
                         para_texts.append(para_text_str)
                         para_boxes.append(para_box)
+                        n_lines.append(n_lines_para)
             elif block.attrib.get("blockType") == "Table":
                 table_rows = []
                 for row in block:
@@ -95,23 +99,8 @@ def get_raw_data(xml_file):
                         row_cells["boxes"].append([np.amin(cell_boxes[:, 0]), np.amin(cell_boxes[:, 1]),
                                                    np.amax(cell_boxes[:, 2]), np.amax(cell_boxes[:, 3])])
                         row_cells["texts"].append(cell_text)
-                        # for text in cell:
-                        #     for para in text:
-                        #         for line in para:
-                        #             char_text = []
-                        #             for formatting in line:
-                        #                 for charParams in formatting:
-                        #                     if charParams.text is not None:
-                        #                         char_text.append(charParams.text)
-                        #                 baseline = int(line.attrib.get("baseline"))
-                        #                 xmin = int(line.attrib.get("l"))  # - 35
-                        #                 ymin = int(line.attrib.get("t"))  # - 35
-                        #                 xmax = int(line.attrib.get("r"))  # + 35
-                        #                 ymax = int(line.attrib.get("b"))  # + 35
-                        #                 cell = [xmin, ymin, xmax, ymax]
-                        #                 row_cells["boxes"].append(cell)
-                        #                 row_cells["texts"].append("".join(char_text))
                     table_rows.append(row_cells)
+                    n_lines.append(len(table_rows))
                 print()
                 all_cells = []
                 for table_row in table_rows:
@@ -130,7 +119,8 @@ def get_raw_data(xml_file):
             "para_texts": para_texts,
             "line_boxes": line_boxes,
             "line_texts": line_texts,
-            "tables": tables
+            "tables": tables,
+            "lines": n_lines,
         }
         pages.append(page)
         page_num += 1
@@ -162,7 +152,7 @@ def get_blocks(shape, boxes):
         img = cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 255, 255), -1)
     # img = cv2.resize(img, fx=0.25, fy=0.25, dsize=None)  # downsizing the image to speed up the process
 
-    kernel = np.ones((1, round(img.shape[0] * 0.6)), np.uint8)  # closing with 60 percent of the width
+    kernel = np.ones((1, round(img.shape[0] * 0.25)), np.uint8)  # closing with 60 percent of the width
     img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
     ret, thresh = cv2.threshold(img, 127, 255, 0)
     contours, img2 = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -184,11 +174,22 @@ def get_col_bounds(boxes, page_width, eps=150):
     col_bounds = []
     while len(boxes) > 0:
         xmin = np.amin(boxes[:, 0])
-        idx = np.logical_and(boxes[:, 0] < xmin + 0.2*page_width, boxes[:, 0] > xmin - 0.2*page_width)
+        idx = np.logical_and(boxes[:, 0] < xmin + 0.2 * page_width, boxes[:, 0] > xmin - 0.2 * page_width)
         col_boxes = boxes[idx]
         col_bounds.append([np.amin(col_boxes[:, 0]), np.amin(col_boxes[:, 1]), np.amax(col_boxes[:, 2]),
                            np.amax(col_boxes[:, 3])])
         boxes = np.delete(boxes, np.where(idx == True), axis=0)
+    to_del = []
+    col_bounds = np.array(col_bounds)
+    for i in range(0, len(col_bounds)):
+        for j in range(0, len(col_bounds)):
+            if i == j:
+                continue
+            if col_bounds[i, 0] >= col_bounds[j, 0] - 10 and col_bounds[i, 2] <= col_bounds[j, 2] + 10:
+                to_del.append(i)
+    col_bounds = col_bounds.tolist()
+    for index in sorted(to_del, reverse=True):
+        del col_bounds[index]
     return col_bounds
 
 
@@ -235,7 +236,7 @@ def merge_blocks(blocks, para_boxes):
 
             bottom_top = np.amax(np.array(working_bounds)[:, 3])
             top_bottom = np.amin(np.array(next_col_bounds)[:, 1])
-            if top_bottom - bottom_top >= 0.2*page_height:
+            if top_bottom - bottom_top >= 0.2 * page_height:
                 working_bounds = []
                 break
 
@@ -244,8 +245,8 @@ def merge_blocks(blocks, para_boxes):
                 lb = np.amin(working_bounds[k][0])
                 ub = np.amax(working_bounds[k][2])
                 for l in range(0, len(next_col_bounds)):
-                    if np.logical_and(next_col_bounds[l][0] >= lb - 0.07*page_width,
-                                      next_col_bounds[l][2] <= ub + 0.07*page_height):
+                    if np.logical_and(next_col_bounds[l][0] >= lb - 0.07 * page_width,
+                                      next_col_bounds[l][2] <= ub + 0.07 * page_height):
 
                         und_cols += 1
                         if next_col_bounds[l][0] < lb:
@@ -263,15 +264,160 @@ def merge_blocks(blocks, para_boxes):
     for j in range(0, len(n)):
         if n[j] == 1:
             for kkk in range(rs[j], rs[j] + rl[j]):
-                merged.append(blocks[kkk])
+                merged.append(blocks[kkk].tolist())
         else:
             to_merge = blocks[rs[j]:rs[j] + rl[j]]
             merged.append([np.amin(to_merge[:, 0]), np.amin(to_merge[:, 1]), np.amax(to_merge[:, 2]),
                            np.amax(to_merge[:, 3])])
+
     if not merged:
         return blocks.tolist()
     else:
         return merged
+
+
+def merge_blocks_2(blocks, boxes, eps=15):
+    blocks = np.array(blocks)
+    blocks = blocks[np.argsort(blocks[:, 1])]
+    boxes = np.array(boxes)
+    n_cols = []
+    page_height = np.amax(blocks[:, 3]) - np.amin(blocks[:, 1])
+    page_width = np.amax(blocks[:, 2]) - np.amin(blocks[:, 0])
+    col_bounds = []
+    for block in blocks:
+        block_boxes = boxes[
+            np.logical_and(np.logical_and(np.logical_and(boxes[:, 0] >= block[0] - eps, boxes[:, 1] >= block[1] - eps),
+                                          boxes[:, 2] <= block[2] + eps), boxes[:, 3] <= block[3] + eps)]
+        n_cols.append(len(get_col_bounds(block_boxes, page_width)))
+        col_bounds.append(get_col_bounds(block_boxes, page_width))
+    col_blocks = []
+    for col_bound in col_bounds:
+        col_bound = np.array(col_bound)
+        bb = [np.amin(col_bound[:, 0]), np.amin(col_bound[:, 1]), np.amax(col_bound[:, 2]), np.amax(col_bound[:, 3])]
+        col_blocks.append(bb)
+    rv, rs, rl = find_runs(n_cols)  # run value, run start, run length
+    cont_blocks = []
+    for i in range(0, len(rv)):
+        cont_blocks.append(col_bounds[rs[i]:rs[i] + rl[i]])
+    comb_column = []
+    for cont_block in cont_blocks:
+        cont_block = np.squeeze(cont_block)
+        if len(cont_block.shape) > 2:  # multi-column
+            for i in range(0, cont_block.shape[1]):
+                aa = [np.amin(cont_block[:, i, 0]), np.amin(cont_block[:, i, 1]), np.amax(cont_block[:, i, 2]),
+                      np.amax(cont_block[:, i, 3])]
+                comb_column.append(aa)
+        else:
+            if cont_block.ndim == 1:
+                cont_block = np.expand_dims(cont_block, axis=0)
+            for column in cont_block:
+                comb_column.append(column.tolist())
+    #  Removing columns inside columns
+    to_del = []
+    for i in range(0, len(comb_column)):
+        top = comb_column[i]
+        for j in range(0, len(comb_column)):
+            if i == j:
+                continue
+            curr = comb_column[j]
+            if curr[0] >= top[0] and curr[1] >= top[1] and curr[2] <= top[2] and curr[3] <= top[3]:
+                to_del.append(j)
+    for index in sorted(to_del, reverse=True):
+        del comb_column[index]
+
+    # #  columns below
+    # for i in range(0, len(comb_column)):
+    #     col = comb_column[i]
+    #     cols_under = []
+    #     for j in range(0, len(comb_column)):
+    #         if i == j:
+    #             continue
+    #         if comb_column[j, 0] >= [0] and curr[1] >= top[1] and curr[2] <= top[2] and curr[3] <= top[3]:
+    #             to_del.append(j)
+    return comb_column
+
+
+def merge_blocks_3(blocks, boxes, eps=15):
+    blocks = np.array(blocks)
+    blocks = blocks[np.argsort(blocks[:, 1])[::-1]]
+    para_boxes = np.array(boxes)
+    eps = 15
+    n_cols = []
+    page_height = np.amax(blocks[:, 3]) - np.amin(blocks[:, 1])
+    page_width = np.amax(blocks[:, 2]) - np.amin(blocks[:, 0])
+    for block in blocks:
+        block_boxes = para_boxes[
+            np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= block[0] - eps,
+                                                         para_boxes[:, 1] >= block[1] - eps),
+                                          para_boxes[:, 2] <= block[2] + eps),
+                           para_boxes[:, 3] <= block[3] + eps)]
+        n_cols.append(len(get_col_bounds(block_boxes, page_width)))
+
+    working_bounds = []
+    for j in range(0, len(n_cols) - 1):
+        if n_cols[j] - n_cols[j + 1] == 1:
+            curr_boxes = para_boxes[
+                np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j, 0] - eps,
+                                                             para_boxes[:, 1] >= blocks[j, 1] - eps),
+                                              para_boxes[:, 2] <= blocks[j, 2] + eps),
+                               para_boxes[:, 3] <= blocks[j, 3] + eps)]
+            next_boxes = para_boxes[
+                np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j + 1, 0] - eps,
+                                                             para_boxes[:, 1] >= blocks[j + 1, 1] - eps),
+                                              para_boxes[:, 2] <= blocks[j + 1, 2] + eps),
+                               para_boxes[:, 3] <= blocks[j + 1, 3] + eps)]
+            curr_col_bounds = np.array(get_col_bounds(curr_boxes, page_width))
+            if not working_bounds:
+                working_bounds = curr_col_bounds.tolist()
+            else:
+                curr_col_bounds = np.vstack((curr_col_bounds, working_bounds))
+                working_bounds = get_col_bounds(curr_col_bounds, page_width)
+            next_col_bounds = get_col_bounds(next_boxes, page_width)
+            if not any(isinstance(el, list) for el in next_col_bounds):
+                next_col_bounds = [next_col_bounds]
+            if not any(isinstance(el, list) for el in working_bounds):
+                working_bounds = [working_bounds]
+
+            bottom_top = np.amax(np.array(working_bounds)[:, 3])
+            top_bottom = np.amin(np.array(next_col_bounds)[:, 1])
+            if top_bottom - bottom_top >= 0.2 * page_height:
+                working_bounds = []
+                break
+
+            und_cols = 0
+            for k in range(0, len(working_bounds)):
+                lb = np.amin(working_bounds[k][0])
+                ub = np.amax(working_bounds[k][2])
+                for l in range(0, len(next_col_bounds)):
+                    if np.logical_and(next_col_bounds[l][0] >= lb - 0.07 * page_width,
+                                      next_col_bounds[l][2] <= ub + 0.07 * page_height):
+
+                        und_cols += 1
+                        if next_col_bounds[l][0] < lb:
+                            lb = next_col_bounds[l][0]
+                        if next_col_bounds[l][2] > ub:
+                            ub = next_col_bounds[l][2]
+            if und_cols == n_cols[j + 1]:
+                n_cols[j + 1] = n_cols[j]
+            else:
+                working_bounds = []
+        else:
+            working_bounds = []
+    n, rs, rl = find_runs(n_cols)
+    merged = []
+    for j in range(0, len(n)):
+        if n[j] == 1:
+            for kkk in range(rs[j], rs[j] + rl[j]):
+                merged.append(blocks[kkk].tolist())
+        else:
+            to_merge = blocks[rs[j]:rs[j] + rl[j]]
+            merged.append([np.amin(to_merge[:, 0]), np.amin(to_merge[:, 1]), np.amax(to_merge[:, 2]),
+                           np.amax(to_merge[:, 3])])
+
+    if not merged:
+        return blocks.tolist()[::-1]
+    else:
+        return merged[::-1]
 
 
 def update_col_bounds(bounds1, bounds2):
