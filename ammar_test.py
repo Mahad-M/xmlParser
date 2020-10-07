@@ -6,7 +6,7 @@ import cv2
 import pdf2image
 from utils import draw_boxes
 from pathlib import Path
-from utils import find_runs, get_raw_data, merge_blocks, create_order, get_blocks
+from utils import *
 
 if __name__ == '__main__':
     img_dir = "/home/mahad/tmp/01-protected-retirement-plan-customer-key-features/png"
@@ -24,13 +24,8 @@ if __name__ == '__main__':
         # all_texts = para_texts + table_texts
         column_blocks = get_blocks((img.shape[0], img.shape[1]), all_boxes)
         column_blocks_merged = merge_blocks(column_blocks, all_boxes)
-        ordered_boxes = create_order(column_blocks_merged, all_boxes)
-        # ordered_texts = []
-        # for i in range(0, len(ordered_boxes)):
-        #     idx = all_boxes.index(ordered_boxes[i])
-        #     ordered_texts.append(all_texts[idx])
-        # if idx:
-        #     del idx
+        column_blocks_merged_3 = merge_blocks_3(column_blocks_merged, all_boxes)
+        ordered_boxes = create_order(column_blocks_merged_3, all_boxes)
         for ordered_box in ordered_boxes:
             img_draw = draw_boxes(img, [ordered_box])
             cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))

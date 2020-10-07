@@ -193,8 +193,10 @@ def get_col_bounds(boxes, page_width, eps=150):
     return col_bounds
 
 
-def merge_blocks(blocks, para_boxes):
+def merge_blocks(blocks, para_boxes, n_lines):
     blocks = np.array(blocks)
+    n_lines = np.array(n_lines)
+    n_lines = n_lines[np.argsort(blocks[:, 1])]
     blocks = blocks[np.argsort(blocks[:, 1])]
     para_boxes = np.array(para_boxes)
     eps = 15
@@ -211,6 +213,8 @@ def merge_blocks(blocks, para_boxes):
 
     working_bounds = []
     for j in range(0, len(n_cols) - 1):
+        if j==12:
+            print()
         if n_cols[j] - n_cols[j + 1] == 1:
             curr_boxes = para_boxes[
                 np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j, 0] - eps,
@@ -253,7 +257,7 @@ def merge_blocks(blocks, para_boxes):
                             lb = next_col_bounds[l][0]
                         if next_col_bounds[l][2] > ub:
                             ub = next_col_bounds[l][2]
-            if und_cols == n_cols[j + 1]:
+            if (und_cols == n_cols[j + 1]) and (n_lines[j+1] != 1):
                 n_cols[j + 1] = n_cols[j]
             else:
                 working_bounds = []

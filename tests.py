@@ -7,8 +7,8 @@ from pathlib import Path
 from utils import *
 
 if __name__ == '__main__':
-    pdf_dir = "/home/mahad/abbyy_dummy_dataset/pdf"
-    xml_dir = "/home/mahad/abbyy_dummy_dataset/xml"
+    pdf_dir = "/home/mahad/abby_file/pdf"
+    xml_dir = "/home/mahad/abby_file/xml"
     save_dir = "/tmp"
     pdf_files = os.listdir(pdf_dir)
     xml_files = os.listdir(xml_dir)
@@ -31,7 +31,17 @@ if __name__ == '__main__':
                 all_boxes = para_boxes + table_boxes
                 all_texts = para_texts + table_texts
                 column_blocks = get_blocks((page["height"], page["width"]), all_boxes)
-                column_blocks_merged = merge_blocks(column_blocks, all_boxes)
+                del_cols = []
+                for i in range(0, len(column_blocks)):
+                    for j in range(0, len(column_blocks)):
+                        if i == j:
+                            continue
+                        if column_blocks[i][0] >= column_blocks[j][0] and column_blocks[i][1] >= column_blocks[j][1] and\
+                            column_blocks[i][2] <= column_blocks[j][2] and column_blocks[i][3] <= column_blocks[j][3]:
+                            del_cols.append(i)
+                for index in sorted(del_cols, reverse=True):
+                    del column_blocks[index]
+                column_blocks_merged = merge_blocks(column_blocks, all_boxes, page["lines"])
                 column_blocks_merged_3 = merge_blocks_3(column_blocks_merged, all_boxes)
                 ordered_boxes = create_order(column_blocks_merged_3, all_boxes)
                 ordered_texts = []
