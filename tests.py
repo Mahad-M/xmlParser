@@ -19,6 +19,8 @@ if __name__ == '__main__':
             pdf_path = os.path.join(pdf_dir, pdf_file)
             xml_data = get_raw_data(xml_path)
             for page in xml_data:
+                if page["page_number"] < 8:
+                    continue
                 para_boxes = page["para_boxes"]
                 para_texts = page["para_texts"]
                 para_boxes, para_texts = remove_empty(para_boxes, para_texts)
@@ -30,7 +32,7 @@ if __name__ == '__main__':
                 img = np.asarray(img[0])
                 all_boxes = para_boxes + table_boxes
                 all_texts = para_texts + table_texts
-                column_blocks = get_blocks((page["height"], page["width"]), all_boxes)
+                column_blocks, n_lines = get_blocks((page["height"], page["width"]), all_boxes, page["line_boxes"])
                 del_cols = []
                 for i in range(0, len(column_blocks)):
                     for j in range(0, len(column_blocks)):
@@ -41,7 +43,7 @@ if __name__ == '__main__':
                             del_cols.append(i)
                 for index in sorted(del_cols, reverse=True):
                     del column_blocks[index]
-                column_blocks_merged = merge_blocks(column_blocks, all_boxes, page["lines"])
+                column_blocks_merged = merge_blocks(column_blocks, all_boxes, n_lines)
                 column_blocks_merged_3 = merge_blocks_3(column_blocks_merged, all_boxes)
                 ordered_boxes = create_order(column_blocks_merged_3, all_boxes)
                 ordered_texts = []

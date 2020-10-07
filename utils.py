@@ -137,8 +137,9 @@ def get_raw_data(xml_file):
     return pages
 
 
-def get_blocks(shape, boxes):
+def get_blocks(shape, boxes, line_boxes):
     """
+    :param n_lines: number of lines in the boxes
     :param shape: tuple (height, width)
     :param boxes: list of boxes
     :return: list of the bounding boxes of all blocks
@@ -147,6 +148,7 @@ def get_blocks(shape, boxes):
     width, height = shape
     img = np.zeros(shape).astype(np.uint8)
     boxes = [bb for bb in boxes if bb]
+    line_boxes = np.array(line_boxes)
     for box in boxes:
         # if box:
         img = cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 255, 255), -1)
@@ -164,8 +166,14 @@ def get_blocks(shape, boxes):
         m = np.mean(patch)
         if m > 128:  # remove black contours
             blocks.append([x, y, x + w, y + h])
-    cv2.imwrite("/tmp/blocks.png", img)
-    return blocks
+    n_lines = []
+    for block in blocks:
+        block_lines = line_boxes[np.logical_and(np.logical_and(np.logical_and(line_boxes[:, 0] >= block[0],
+                                                                                         line_boxes[:, 1] >= block[1]),
+                                                                          line_boxes[:, 2] <= block[2]),
+                                                           line_boxes[:, 3] <= block[3])]
+        n_lines.append(len(block_lines))
+    return blocks, n_lines
 
 
 def get_col_bounds(boxes, page_width, eps=150):
@@ -213,8 +221,6 @@ def merge_blocks(blocks, para_boxes, n_lines):
 
     working_bounds = []
     for j in range(0, len(n_cols) - 1):
-        if j==12:
-            print()
         if n_cols[j] - n_cols[j + 1] == 1:
             curr_boxes = para_boxes[
                 np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j, 0] - eps,
@@ -257,7 +263,7 @@ def merge_blocks(blocks, para_boxes, n_lines):
                             lb = next_col_bounds[l][0]
                         if next_col_bounds[l][2] > ub:
                             ub = next_col_bounds[l][2]
-            if (und_cols == n_cols[j + 1]) and (n_lines[j+1] != 1):
+            if (und_cols == n_cols[j + 1]) and (n_lines[j + 1] != 1):
                 n_cols[j + 1] = n_cols[j]
             else:
                 working_bounds = []
