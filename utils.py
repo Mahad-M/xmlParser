@@ -25,16 +25,21 @@ def draw_boxes(curr_page, bounding_box, bb_color=(0, 0, 255)):
 
 def get_raw_data(xml_file):
     tree = etree.parse(xml_file)
+    for elem in tree.getiterator():
+        elem.tag = etree.QName(elem).localname
     root = tree.getroot()
     page_num = 1
     pages = []
     for page in root:  # iterate over pages
+        # paragraph level features
         line_boxes = []
         line_texts = []
         para_boxes = []
         para_texts = []
         tables = []
         n_lines = []
+        is_heading = []
+        ###############################
         height = int(page.attrib.get("height"))
         width = int(page.attrib.get("width"))
         for block in page:  # iterate over blocks
@@ -45,6 +50,9 @@ def get_raw_data(xml_file):
                         para_box = []
                         para_text = []
                         n_lines_para = 0
+                        char_bold = []
+                        char_italic = []
+                        char_underline = []
                         for line in para:  # iterate over lines
                             char_text = []
                             n_lines_para += 1
@@ -52,6 +60,18 @@ def get_raw_data(xml_file):
                                 for charParams in formatting:  # iterating over characters
                                     if charParams.text is not None:
                                         char_text.append(charParams.text)
+                                    if "bold" in charParams.attrib.keys():
+                                        char_bold.append(1)
+                                    else:
+                                        char_bold.append(0)
+                                    if "italic" in charParams.attrib.keys():
+                                        char_italic.append(1)
+                                    else:
+                                        char_italic.append(0)
+                                    if "underline" in charParams.attrib.keys():
+                                        char_underline.append(1)
+                                    else:
+                                        char_underline.append(0)
                             baseline = int(line.attrib.get("baseline"))
                             xmin = int(line.attrib.get("l"))
                             ymin = int(line.attrib.get("t"))
@@ -74,10 +94,16 @@ def get_raw_data(xml_file):
                             line_texts.extend(line_text)
                             para_text.append(line_text[0])
                         para_text_str = " ".join(para_text)
-                        para_texts.append(para_text_str)
-                        para_boxes.append(para_box)
-                        n_lines.append(n_lines_para)
+                        if para_text_str != "" and para_box != []:
+                            para_texts.append(para_text_str)
+                            para_boxes.append(para_box)
+                            n_lines.append(n_lines_para)
+                            if char_bold and sum(char_bold) >= 0.75 * len(char_bold) and n_lines_para <= 2:
+                                is_heading.append(1)
+                            else:
+                                is_heading.append(0)
             elif block.attrib.get("blockType") == "Table":
+                is_heading.append(0)
                 table_rows = []
                 for row in block:
                     row_cells = {"boxes": [], "texts": []}
@@ -85,11 +111,11 @@ def get_raw_data(xml_file):
                         cell_boxes = []
                         cell_text = ""
                         for elem in cell.iter():
-                            if elem.tag.count("line") > 0:
+                            if elem.tag == "line":
                                 cell_boxes.append([elem.attrib["l"], elem.attrib["t"], elem.attrib["r"],
                                                    elem.attrib["b"]])
                                 for sub_elem in elem.iter():
-                                    if sub_elem.tag.count("charParams") > 0:
+                                    if sub_elem.tag == "charParams":
                                         cell_text += sub_elem.text
                         if cell_boxes == [] and cell_text == "":
                             continue
@@ -101,7 +127,6 @@ def get_raw_data(xml_file):
                         row_cells["texts"].append(cell_text)
                     table_rows.append(row_cells)
                     n_lines.append(len(table_rows))
-                print()
                 all_cells = []
                 for table_row in table_rows:
                     all_cells.extend(table_row["boxes"])
@@ -117,6 +142,7 @@ def get_raw_data(xml_file):
             "height": height,
             "para_boxes": para_boxes,
             "para_texts": para_texts,
+            "is_heading": is_heading,
             "line_boxes": line_boxes,
             "line_texts": line_texts,
             "tables": tables,
@@ -124,16 +150,6 @@ def get_raw_data(xml_file):
         }
         pages.append(page)
         page_num += 1
-
-    # result = {
-    #     "width": width,
-    #     "height": height,
-    #     "para_boxes": para_boxes,
-    #     "para_texts": para_texts,
-    #     "line_boxes": line_boxes,
-    #     "line_texts": line_texts,
-    #     "tables": tables
-    # }
     return pages
 
 
@@ -152,7 +168,7 @@ def get_blocks(shape, boxes):
         img = cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 255, 255), -1)
     # img = cv2.resize(img, fx=0.25, fy=0.25, dsize=None)  # downsizing the image to speed up the process
 
-    kernel = np.ones((1, round(img.shape[0] * 0.25)), np.uint8)  # closing with 60 percent of the width
+    kernel = np.ones((1, round(img.shape[0] * 0.25)), np.uint8)  # closing with 25 percent of the width
     img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
     ret, thresh = cv2.threshold(img, 127, 255, 0)
     contours, img2 = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -162,9 +178,20 @@ def get_blocks(shape, boxes):
         x, y, w, h = cv2.boundingRect(cnt)
         patch = img[y:y + h - 1, x:x + w - 1]
         m = np.mean(patch)
-        if m > 128:  # remove black contours
+        if m > 64:  # remove black contours
             blocks.append([x, y, x + w, y + h])
-    cv2.imwrite("/tmp/blocks.png", img)
+        else:
+            print("contour dropped in get_blocks")
+    to_del = []
+    for i, block in enumerate(blocks):
+        for j, block2 in enumerate(blocks):
+            if not i == j:
+                if block[0] <= block2[0] and block[1] <= block2[1] and block[2] >= block2[2] and block[3] >= block2[3]:
+                    to_del.append(j)
+    for index in sorted(to_del, reverse=True):
+        del blocks[index]
+    # cv2.imshow('', cv2.resize(img, fx=0.25, fy=0.25, dsize=None))
+    # cv2.waitKey()
     return blocks
 
 
@@ -193,35 +220,38 @@ def get_col_bounds(boxes, page_width, eps=150):
     return col_bounds
 
 
-def merge_blocks(blocks, para_boxes):
+def get_block_para(block, paras, eps):
+    block_boxes = paras[
+        np.logical_and(np.logical_and(np.logical_and(paras[:, 0] >= block[0] - eps,
+                                                     paras[:, 1] >= block[1] - eps),
+                                      paras[:, 2] <= block[2] + eps),
+                       paras[:, 3] <= block[3] + eps)]
+    return block_boxes
+
+
+def merge_blocks(blocks, para_boxes, is_heading):
     blocks = np.array(blocks)
     blocks = blocks[np.argsort(blocks[:, 1])]
     para_boxes = np.array(para_boxes)
+    is_heading = np.array(is_heading)
+    is_heading = is_heading[np.argsort(para_boxes[:, 1])]
+    para_boxes = para_boxes[np.argsort(para_boxes[:, 1])]
     eps = 15
     n_cols = []
     page_height = np.amax(blocks[:, 3]) - np.amin(blocks[:, 1])
     page_width = np.amax(blocks[:, 2]) - np.amin(blocks[:, 0])
     for block in blocks:
-        block_boxes = para_boxes[
-            np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= block[0] - eps,
-                                                         para_boxes[:, 1] >= block[1] - eps),
-                                          para_boxes[:, 2] <= block[2] + eps),
-                           para_boxes[:, 3] <= block[3] + eps)]
+        block_boxes = get_block_para(block, para_boxes, eps)
         n_cols.append(len(get_col_bounds(block_boxes, page_width)))
 
     working_bounds = []
     for j in range(0, len(n_cols) - 1):
         if n_cols[j] - n_cols[j + 1] == 1:
-            curr_boxes = para_boxes[
-                np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j, 0] - eps,
-                                                             para_boxes[:, 1] >= blocks[j, 1] - eps),
-                                              para_boxes[:, 2] <= blocks[j, 2] + eps),
-                               para_boxes[:, 3] <= blocks[j, 3] + eps)]
-            next_boxes = para_boxes[
-                np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j + 1, 0] - eps,
-                                                             para_boxes[:, 1] >= blocks[j + 1, 1] - eps),
-                                              para_boxes[:, 2] <= blocks[j + 1, 2] + eps),
-                               para_boxes[:, 3] <= blocks[j + 1, 3] + eps)]
+            curr_boxes = get_block_para(blocks[j], para_boxes, eps)
+            next_boxes = get_block_para(blocks[j + 1], para_boxes, eps)
+            next_boxes = next_boxes[np.argsort(next_boxes[:, 1])]
+            idx = np.where((para_boxes == next_boxes[0, :]).all(axis=1))
+            next_head = is_heading[idx[0][0]]
             curr_col_bounds = np.array(get_col_bounds(curr_boxes, page_width))
             if not working_bounds:
                 working_bounds = curr_col_bounds.tolist()
@@ -253,8 +283,15 @@ def merge_blocks(blocks, para_boxes):
                             lb = next_col_bounds[l][0]
                         if next_col_bounds[l][2] > ub:
                             ub = next_col_bounds[l][2]
-            if und_cols == n_cols[j + 1]:
-                n_cols[j + 1] = n_cols[j]
+            if und_cols == n_cols[j + 1]:  # todo: revisit this
+                if next_head == 1:
+                    ss = sum(is_heading[idx[0][0]+1:])
+                    if ss > 0:
+                        n_cols[j + 1] = n_cols[j]
+                    else:
+                        break
+                else:
+                    n_cols[j + 1] = n_cols[j]
             else:
                 working_bounds = []
         else:
@@ -281,13 +318,11 @@ def merge_blocks_2(blocks, boxes, eps=15):
     blocks = blocks[np.argsort(blocks[:, 1])]
     boxes = np.array(boxes)
     n_cols = []
-    page_height = np.amax(blocks[:, 3]) - np.amin(blocks[:, 1])
+    # page_height = np.amax(blocks[:, 3]) - np.amin(blocks[:, 1])
     page_width = np.amax(blocks[:, 2]) - np.amin(blocks[:, 0])
     col_bounds = []
     for block in blocks:
-        block_boxes = boxes[
-            np.logical_and(np.logical_and(np.logical_and(boxes[:, 0] >= block[0] - eps, boxes[:, 1] >= block[1] - eps),
-                                          boxes[:, 2] <= block[2] + eps), boxes[:, 3] <= block[3] + eps)]
+        block_boxes = get_block_para(block, boxes, eps)
         n_cols.append(len(get_col_bounds(block_boxes, page_width)))
         col_bounds.append(get_col_bounds(block_boxes, page_width))
     col_blocks = []
@@ -346,26 +381,14 @@ def merge_blocks_3(blocks, boxes, eps=15):
     page_height = np.amax(blocks[:, 3]) - np.amin(blocks[:, 1])
     page_width = np.amax(blocks[:, 2]) - np.amin(blocks[:, 0])
     for block in blocks:
-        block_boxes = para_boxes[
-            np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= block[0] - eps,
-                                                         para_boxes[:, 1] >= block[1] - eps),
-                                          para_boxes[:, 2] <= block[2] + eps),
-                           para_boxes[:, 3] <= block[3] + eps)]
+        block_boxes = get_block_para(block, para_boxes, eps)
         n_cols.append(len(get_col_bounds(block_boxes, page_width)))
 
     working_bounds = []
     for j in range(0, len(n_cols) - 1):
         if n_cols[j] - n_cols[j + 1] == 1:
-            curr_boxes = para_boxes[
-                np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j, 0] - eps,
-                                                             para_boxes[:, 1] >= blocks[j, 1] - eps),
-                                              para_boxes[:, 2] <= blocks[j, 2] + eps),
-                               para_boxes[:, 3] <= blocks[j, 3] + eps)]
-            next_boxes = para_boxes[
-                np.logical_and(np.logical_and(np.logical_and(para_boxes[:, 0] >= blocks[j + 1, 0] - eps,
-                                                             para_boxes[:, 1] >= blocks[j + 1, 1] - eps),
-                                              para_boxes[:, 2] <= blocks[j + 1, 2] + eps),
-                               para_boxes[:, 3] <= blocks[j + 1, 3] + eps)]
+            curr_boxes = get_block_para(blocks[j], para_boxes, eps)
+            next_boxes = get_block_para(blocks[j + 1], para_boxes, eps)
             curr_col_bounds = np.array(get_col_bounds(curr_boxes, page_width))
             if not working_bounds:
                 working_bounds = curr_col_bounds.tolist()

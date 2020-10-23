@@ -7,8 +7,8 @@ from pathlib import Path
 from utils import *
 
 if __name__ == '__main__':
-    pdf_dir = "/home/mahad/abbyy_dummy_dataset/pdf"
-    xml_dir = "/home/mahad/abbyy_dummy_dataset/xml"
+    pdf_dir = "/home/mahad/abby_file/pdf"
+    xml_dir = "/home/mahad/abby_file/xml"
     save_dir = "/tmp"
     pdf_files = os.listdir(pdf_dir)
     xml_files = os.listdir(xml_dir)
