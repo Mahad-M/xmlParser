@@ -153,9 +153,8 @@ def get_raw_data(xml_file):
     return pages
 
 
-def get_blocks(shape, boxes, line_boxes):
+def get_blocks(shape, boxes):
     """
-    :param n_lines: number of lines in the boxes
     :param shape: tuple (height, width)
     :param boxes: list of boxes
     :return: list of the bounding boxes of all blocks
@@ -164,7 +163,6 @@ def get_blocks(shape, boxes, line_boxes):
     width, height = shape
     img = np.zeros(shape).astype(np.uint8)
     boxes = [bb for bb in boxes if bb]
-    line_boxes = np.array(line_boxes)
     for box in boxes:
         # if box:
         img = cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 255, 255), -1)
@@ -182,16 +180,6 @@ def get_blocks(shape, boxes, line_boxes):
         m = np.mean(patch)
         if m > 64:  # remove black contours
             blocks.append([x, y, x + w, y + h])
-<<<<<<< HEAD
-    n_lines = []
-    for block in blocks:
-        block_lines = line_boxes[np.logical_and(np.logical_and(np.logical_and(line_boxes[:, 0] >= block[0],
-                                                                                         line_boxes[:, 1] >= block[1]),
-                                                                          line_boxes[:, 2] <= block[2]),
-                                                           line_boxes[:, 3] <= block[3])]
-        n_lines.append(len(block_lines))
-    return blocks, n_lines
-=======
         else:
             print("contour dropped in get_blocks")
     to_del = []
@@ -205,7 +193,6 @@ def get_blocks(shape, boxes, line_boxes):
     # cv2.imshow('', cv2.resize(img, fx=0.25, fy=0.25, dsize=None))
     # cv2.waitKey()
     return blocks
->>>>>>> tmp
 
 
 def get_col_bounds(boxes, page_width, eps=150):
@@ -233,9 +220,6 @@ def get_col_bounds(boxes, page_width, eps=150):
     return col_bounds
 
 
-<<<<<<< HEAD
-def merge_blocks(blocks, para_boxes, n_lines):
-=======
 def get_block_para(block, paras, eps):
     block_boxes = paras[
         np.logical_and(np.logical_and(np.logical_and(paras[:, 0] >= block[0] - eps,
@@ -246,10 +230,7 @@ def get_block_para(block, paras, eps):
 
 
 def merge_blocks(blocks, para_boxes, is_heading):
->>>>>>> tmp
     blocks = np.array(blocks)
-    n_lines = np.array(n_lines)
-    n_lines = n_lines[np.argsort(blocks[:, 1])]
     blocks = blocks[np.argsort(blocks[:, 1])]
     para_boxes = np.array(para_boxes)
     is_heading = np.array(is_heading)
@@ -302,10 +283,6 @@ def merge_blocks(blocks, para_boxes, is_heading):
                             lb = next_col_bounds[l][0]
                         if next_col_bounds[l][2] > ub:
                             ub = next_col_bounds[l][2]
-<<<<<<< HEAD
-            if (und_cols == n_cols[j + 1]) and (n_lines[j + 1] != 1):
-                n_cols[j + 1] = n_cols[j]
-=======
             if und_cols == n_cols[j + 1]:  # todo: revisit this
                 if next_head == 1:
                     ss = sum(is_heading[idx[0][0]+1:])
@@ -315,7 +292,6 @@ def merge_blocks(blocks, para_boxes, is_heading):
                         break
                 else:
                     n_cols[j + 1] = n_cols[j]
->>>>>>> tmp
             else:
                 working_bounds = []
         else:
