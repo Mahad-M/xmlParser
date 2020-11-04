@@ -224,7 +224,8 @@ def get_blocks(shape, boxes):
     tops, bottoms = get_separator(boxes, vertical=1)
     for top, bottom in zip(tops, bottoms):
         block_boxes = boxes[np.logical_and(boxes[:, 1] >= top, boxes[:, 3] <= bottom)]
-        blocks.append([np.amin(block_boxes[:, 0]), top, np.amax(block_boxes[:, 2]), bottom])
+        if block_boxes.shape[0] != 0:
+            blocks.append([np.amin(block_boxes[:, 0]), top, np.amax(block_boxes[:, 2]), bottom])
     return blocks
 
 
