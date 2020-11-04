@@ -23,6 +23,28 @@ def draw_boxes(curr_page, bounding_box, bb_color=(0, 0, 255)):
     return curr_page_image
 
 
+def draw_lines(curr_page, coords, vertical=0, bb_color=(0, 0, 255)):
+    """
+    :param vertical: boolean; 1 for vertical line 0 for horizontal
+    :param bb_color: color of bounding box
+    :param curr_page: numpy array
+    :param coords:
+    :return: current page with bounding boxes drawn
+    """
+    # curr_page_image = curr_page[:, :, ::-1].copy()  # converting to opencv image
+    curr_page_image = curr_page
+    # page_num, bbox, page_width, page_height = bounding_box
+    for j in range(0, len(coords)):
+        if vertical:
+            start = (coords[j], 0)
+            end = (coords[j], curr_page_image.shape[1])
+        else:
+            start = (0, coords[j])
+            end = (curr_page_image.shape[0], coords[j])
+        curr_page_image = cv2.line(curr_page_image, start, end, bb_color, 5)
+    return curr_page_image
+
+
 def get_raw_data(xml_file):
     tree = etree.parse(xml_file)
     for elem in tree.getiterator():
@@ -72,7 +94,6 @@ def get_raw_data(xml_file):
                                         char_underline.append(1)
                                     else:
                                         char_underline.append(0)
-                            baseline = int(line.attrib.get("baseline"))
                             xmin = int(line.attrib.get("l"))
                             ymin = int(line.attrib.get("t"))
                             xmax = int(line.attrib.get("r"))
@@ -125,15 +146,17 @@ def get_raw_data(xml_file):
                         row_cells["boxes"].append([np.amin(cell_boxes[:, 0]), np.amin(cell_boxes[:, 1]),
                                                    np.amax(cell_boxes[:, 2]), np.amax(cell_boxes[:, 3])])
                         row_cells["texts"].append(cell_text)
-                    table_rows.append(row_cells)
-                    n_lines.append(len(table_rows))
+                    if row_cells["boxes"]:
+                        table_rows.append(row_cells)
+                        n_lines.append(len(table_rows))
                 all_cells = []
                 for table_row in table_rows:
                     all_cells.extend(table_row["boxes"])
-                all_cells = np.array(all_cells)
-                complete_table["bbox"] = [np.amin(all_cells[:, 0]), np.amin(all_cells[:, 1]), np.amax(all_cells[:, 2]),
-                                          np.amax(all_cells[:, 3])]
-                complete_table["rows"].extend(table_rows)
+                if all_cells:
+                    all_cells = np.array(all_cells)
+                    complete_table["bbox"] = [np.amin(all_cells[:, 0]), np.amin(all_cells[:, 1]), np.amax(all_cells[:, 2]),
+                                              np.amax(all_cells[:, 3])]
+                    complete_table["rows"].extend(table_rows)
             if not complete_table["rows"] == []:
                 tables.append(complete_table)
         page = {
@@ -159,44 +182,54 @@ def get_blocks(shape, boxes):
     :param boxes: list of boxes
     :return: list of the bounding boxes of all blocks
     """
-    # boxes = np.array(boxes)
-    width, height = shape
-    img = np.zeros(shape).astype(np.uint8)
-    boxes = [bb for bb in boxes if bb]
-    for box in boxes:
-        # if box:
-        img = cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 255, 255), -1)
-    # img = cv2.resize(img, fx=0.25, fy=0.25, dsize=None)  # downsizing the image to speed up the process
-
-    kernel = np.ones((1, round(img.shape[0] * 0.25)), np.uint8)  # closing with 25 percent of the width
-    img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
-    ret, thresh = cv2.threshold(img, 127, 255, 0)
-    contours, img2 = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
+    # # boxes = np.array(boxes)
+    # width, height = shape
+    # img = np.zeros(shape).astype(np.uint8)
+    # boxes = [bb for bb in boxes if bb]
+    # for box in boxes:
+    #     # if box:
+    #     img = cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 255, 255), -1)
+    # # img = cv2.resize(img, fx=0.25, fy=0.25, dsize=None)  # downsizing the image to speed up the process
+    # # img = cv2.copyMakeBorder(img, round(img.shape[0] * 0.25), round(img.shape[1] * 0.25), round(img.shape[0] * 0.25),
+    # #                          round(img.shape[1] * 0.25), cv2.BORDER_CONSTANT, value=(0, 0, 0))
+    # kernel = np.ones((1, round(img.shape[0] * 0.5)), np.uint8)  # closing with 50 percent of the width
+    # img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
+    # # cv2.imshow('', cv2.resize(img, fx=0.25, fy=0.25, dsize=None))
+    # # cv2.waitKey()
+    # ret, thresh = cv2.threshold(img, 127, 255, 0)
+    # contours, img2 = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    #
+    # blocks = []
+    # for cnt in contours:
+    #     x, y, w, h = cv2.boundingRect(cnt)
+    #     patch = img[y:y + h - 1, x:x + w - 1]
+    #     m = np.mean(patch)
+    #     if m > 64:  # remove black contours
+    #         blocks.append([x, y, x + w, y + h])
+    #     else:
+    #         print("contour dropped in get_blocks")
+    # to_del = []
+    # for i, block in enumerate(blocks):
+    #     for j, block2 in enumerate(blocks):
+    #         if not i == j:
+    #             if block[0] <= block2[0] and block[1] <= block2[1] and block[2] >= block2[2] and block[3] >= block2[3]:
+    #                 to_del.append(j)
+    # for index in sorted(to_del, reverse=True):
+    #     del blocks[index]
+    # # cv2.imshow('', cv2.resize(img, fx=0.25, fy=0.25, dsize=None))
+    # # cv2.waitKey()
     blocks = []
-    for cnt in contours:
-        x, y, w, h = cv2.boundingRect(cnt)
-        patch = img[y:y + h - 1, x:x + w - 1]
-        m = np.mean(patch)
-        if m > 64:  # remove black contours
-            blocks.append([x, y, x + w, y + h])
-        else:
-            print("contour dropped in get_blocks")
-    to_del = []
-    for i, block in enumerate(blocks):
-        for j, block2 in enumerate(blocks):
-            if not i == j:
-                if block[0] <= block2[0] and block[1] <= block2[1] and block[2] >= block2[2] and block[3] >= block2[3]:
-                    to_del.append(j)
-    for index in sorted(to_del, reverse=True):
-        del blocks[index]
-    # cv2.imshow('', cv2.resize(img, fx=0.25, fy=0.25, dsize=None))
-    # cv2.waitKey()
+    if not isinstance(boxes, np.ndarray):
+        boxes = np.array(boxes)
+    tops, bottoms = get_separator(boxes, vertical=1)
+    for top, bottom in zip(tops, bottoms):
+        block_boxes = boxes[np.logical_and(boxes[:, 1] >= top, boxes[:, 3] <= bottom)]
+        blocks.append([np.amin(block_boxes[:, 0]), top, np.amax(block_boxes[:, 2]), bottom])
     return blocks
 
 
 def get_col_bounds(boxes, page_width, eps=150):
-    # boxes = np.array(boxes)
+    boxes = np.array(boxes)
     boxes = boxes[np.argsort(boxes[:, 0])]
     col_bounds = []
     while len(boxes) > 0:
@@ -217,7 +250,35 @@ def get_col_bounds(boxes, page_width, eps=150):
     col_bounds = col_bounds.tolist()
     for index in sorted(to_del, reverse=True):
         del col_bounds[index]
+    # seps1, seps2 = get_separator(boxes, vertical=0)
+    # boxes = np.array(boxes)
+    # col_bounds = [[ele1, np.amin(boxes[:, 1]), ele2, np.amax(boxes[:, 3])] for ele1, ele2 in zip(seps1, seps2)]
     return col_bounds
+
+
+def get_separator(boxes, vertical=1):
+    seps1 = []  # separator starts
+    seps2 = []  # separator ends
+    boxes = np.array(boxes)
+    assert vertical == 0 or vertical == 1
+    # boxes = boxes[np.argsort(boxes[:, 1])]
+    if vertical == 1:
+        for i, box in enumerate(boxes):
+            crossing_boxes_start = boxes[np.logical_and(boxes[:, 1] < box[1], boxes[:, 3] > box[1])].tolist()
+            crossing_boxes_end = boxes[np.logical_and(boxes[:, 1] < box[3], boxes[:, 3] > box[3])].tolist()
+            if not crossing_boxes_start and box[1] not in seps1:
+                seps1.append(box[1])
+            if not crossing_boxes_end and box[3] not in seps2:
+                seps2.append(box[3])
+    else:
+        for i, box in enumerate(boxes):
+            crossing_boxes_start = boxes[np.logical_and(boxes[:, 0] < box[0], boxes[:, 2] > box[0])].tolist()
+            crossing_boxes_end = boxes[np.logical_and(boxes[:, 0] < box[2], boxes[:, 2] > box[2])].tolist()
+            if not crossing_boxes_start and box[0] not in seps1:
+                seps1.append(box[0])
+            if not crossing_boxes_end and box[0] not in seps2:
+                seps2.append(box[2])
+    return seps1, seps2
 
 
 def get_block_para(block, paras, eps):
@@ -470,10 +531,7 @@ def create_order(blocks, boxes):
     eps = 3
     boxes_out = []
     for block in blocks:
-        block_boxes = boxes[
-            np.logical_and(np.logical_and(np.logical_and(boxes[:, 0] >= block[0] - eps, boxes[:, 1] >= block[1] - eps),
-                                          boxes[:, 2] <= block[2] + eps), boxes[:, 3] <= block[3] + eps)]
-        # block_boxes = block_boxes[np.argsort(block_boxes[:, 1])]
+        block_boxes = get_block_para(block, boxes, eps)
         block_width = block[2] - block[0]
         block_height = block[3] - block[1]
         while len(block_boxes) > 0:

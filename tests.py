@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 import cv2
 import pdf2image
+from utils import draw_boxes
 from pathlib import Path
 from utils import *
 
@@ -19,10 +20,14 @@ if __name__ == '__main__':
             pdf_path = os.path.join(pdf_dir, pdf_file)
             xml_data = get_raw_data(xml_path)
             for page in xml_data:
-                if page["page_number"] < 8:
-                    continue
+                if page["page_number"] == 3:
+                    print()
                 para_boxes = page["para_boxes"]
                 para_texts = page["para_texts"]
+                is_para_heading = page["is_heading"]
+                # para_boxes = [x for x in para_boxes_ if x != []]
+                # para_texts = [x for x in para_texts_ if x != ""]
+                assert len(para_boxes) == len(para_texts)
                 para_boxes, para_texts = remove_empty(para_boxes, para_texts)
                 tables = page["tables"]
                 table_boxes = [tt["bbox"] for tt in tables]
@@ -32,29 +37,24 @@ if __name__ == '__main__':
                 img = np.asarray(img[0])
                 all_boxes = para_boxes + table_boxes
                 all_texts = para_texts + table_texts
-                column_blocks, n_lines = get_blocks((page["height"], page["width"]), all_boxes, page["line_boxes"])
-                del_cols = []
-                for i in range(0, len(column_blocks)):
-                    for j in range(0, len(column_blocks)):
-                        if i == j:
-                            continue
-                        if column_blocks[i][0] >= column_blocks[j][0] and column_blocks[i][1] >= column_blocks[j][1] and\
-                            column_blocks[i][2] <= column_blocks[j][2] and column_blocks[i][3] <= column_blocks[j][3]:
-                            del_cols.append(i)
-                for index in sorted(del_cols, reverse=True):
-                    del column_blocks[index]
-                column_blocks_merged = merge_blocks(column_blocks, all_boxes, n_lines)
-                column_blocks_merged_3 = merge_blocks_3(column_blocks_merged, all_boxes)
-                ordered_boxes = create_order(column_blocks_merged_3, all_boxes)
+                column_blocks = get_blocks((page["height"], page["width"]), all_boxes)
+                # ################## MAHAD ################################ #
+                # if page["page_number"] == 3:
+                #     img_draw = draw_boxes(img, column_blocks)
+                #     cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
+                #     cv2.waitKey()
+                # ######################################################### #
+                column_blocks_merged = merge_blocks_2(column_blocks, all_boxes)
+                ordered_boxes = create_order(column_blocks_merged, all_boxes)
                 ordered_texts = []
                 for i in range(0, len(ordered_boxes)):
                     idx = all_boxes.index(ordered_boxes[i])
                     ordered_texts.append(all_texts[idx])
                 if idx:
                     del idx
-                for i in range(0, len(ordered_boxes)):
+                for i in range(0, len(column_blocks_merged)):
                     if not isinstance(ordered_texts[i], list):
-                        img_draw = draw_boxes(img, [ordered_boxes[i]])
+                        img_draw = draw_boxes(img, [column_blocks_merged[i]])
                         cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
                         cv2.waitKey()
                     else:

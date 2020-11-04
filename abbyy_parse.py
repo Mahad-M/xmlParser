@@ -44,7 +44,7 @@ if __name__ == '__main__':
                 #     cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
                 #     cv2.waitKey()
                 # ######################################################### #
-                column_blocks_merged = merge_blocks(column_blocks, all_boxes, all_texts)
+                column_blocks_merged = merge_blocks(column_blocks, all_boxes, is_para_heading)
                 ordered_boxes = create_order(column_blocks_merged, all_boxes)
                 ordered_texts = []
                 for i in range(0, len(ordered_boxes)):
@@ -52,9 +52,9 @@ if __name__ == '__main__':
                     ordered_texts.append(all_texts[idx])
                 if idx:
                     del idx
-                for i in range(0, len(ordered_boxes)):
+                for i in range(0, len(column_blocks)):
                     if not isinstance(ordered_texts[i], list):
-                        img_draw = draw_boxes(img, [ordered_boxes[i]])
+                        img_draw = draw_boxes(img, [column_blocks[i]])
                         cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
                         cv2.waitKey()
                     else:
