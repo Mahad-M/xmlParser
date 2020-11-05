@@ -277,8 +277,10 @@ def get_separator(boxes, vertical=1):
             crossing_boxes_end = boxes[np.logical_and(boxes[:, 0] < box[2], boxes[:, 2] > box[2])].tolist()
             if not crossing_boxes_start and box[0] not in seps1:
                 seps1.append(box[0])
-            if not crossing_boxes_end and box[0] not in seps2:
+            if not crossing_boxes_end and box[2] not in seps2:
                 seps2.append(box[2])
+    seps2.sort()
+    seps1.sort()
     return seps1, seps2
 
 
@@ -519,7 +521,6 @@ def update_col_bounds(bounds1, bounds2):
 def lies_under(bounds1, bounds2, eps=85):
     bounds1 = np.array(bounds1)
     bounds2 = np.array(bounds2)
-    out_cols = []
     for i in range(0, len(bounds1)):
         if (bounds2[0] >= bounds1[i, 0] - eps) and (bounds2[2] <= bounds1[i, 2] + eps):
             return i
@@ -534,7 +535,6 @@ def create_order(blocks, boxes):
     for block in blocks:
         block_boxes = get_block_para(block, boxes, eps)
         block_width = block[2] - block[0]
-        block_height = block[3] - block[1]
         while len(block_boxes) > 0:
             idx = np.logical_and(np.amin(block_boxes[:, 0]) - 0.1 * block_width <= block_boxes[:, 0],
                                  block_boxes[:, 0] <= np.amin(block_boxes[:, 0] + 0.1 * block_width))
@@ -547,6 +547,33 @@ def create_order(blocks, boxes):
         return boxes.tolist()
     else:
         return boxes_out
+
+
+def overlap(min1, max1, min2, max2):
+    return max(0, min(max1, max2) - max(min1, min2))
+
+
+def create_order2(blocks, boxes, img):
+    blocks = np.array(blocks)
+    boxes = np.array(boxes)
+    eps = 3
+    boxes_out = []
+    blocks = blocks[np.argsort(blocks[:, 1])]
+    for block in blocks:
+        block_boxes = get_block_para(block, boxes, eps)
+        block_boxes = block_boxes[np.argsort(block_boxes[:, 1])]
+        seps_l, seps_r = get_separator(block_boxes, vertical=0)
+        # img_draw = draw_boxes(img, [block], (0, 255, 0))
+        for left, right in zip(seps_l, seps_r):
+            col_block = [left, block[1], right, block[3]]
+            # img_draw = draw_boxes(img, [col_block])
+            # cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
+            # cv2.waitKey()
+            col_boxes = get_block_para(col_block, block_boxes, eps=3)
+            print()
+            col_boxes = col_boxes[np.argsort(col_boxes[:, 1])]
+            boxes_out.extend(col_boxes.tolist())
+    return boxes_out
 
 
 def find_runs(x):
