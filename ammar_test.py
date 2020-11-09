@@ -11,15 +11,15 @@ from utils import *
 import glob
 
 if __name__ == '__main__':
-    img_files = "test/images/Barclays_BPSP_Key_Features_Document/*.png"
+    img_files = "test/images/group-sipp-key-features/*.png"
     # pdf_file = "test/pdf/Ascentric_Pension_Account_SIPP_key_features_document.pdf"
     df_dir = "test/dfs"
-    df_p_dir = "test/dfs_2/Barclays_BPSP_Key_Features_Document"
+    df_p_dir = "test/dfs_2/group-sipp-key-features"
     if __name__ == '__main__':
         imgs = glob.glob(img_files)
         imgs.sort()
         for i, img_file in enumerate(imgs):
-            # if i == 4:
+            if i == 2:
                 para_boxes = []
                 is_bold = []
                 img = cv2.imread(img_file)
@@ -50,8 +50,8 @@ if __name__ == '__main__':
                 column_blocks = get_blocks((img.shape[0], img.shape[1]), para_boxes)
                 column_blocks_merged = merge_blocks(column_blocks, para_boxes, is_bold)
                 ordered_boxes = create_order2(column_blocks_merged, para_boxes, img)
-                for ordered_box in ordered_boxes:
-                    img_draw = draw_boxes(img, [ordered_box])
-                    cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
-                    cv2.waitKey()
+                # for ordered_box in column_blocks_merged:
+                #     img_draw = draw_boxes(img, [ordered_box])
+                #     cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
+                #     cv2.waitKey()
 

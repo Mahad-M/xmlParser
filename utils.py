@@ -249,6 +249,7 @@ def get_col_bounds(boxes, page_width, eps=150):
             if col_bounds[i, 0] >= col_bounds[j, 0] - 10 and col_bounds[i, 2] <= col_bounds[j, 2] + 10:
                 to_del.append(i)
     col_bounds = col_bounds.tolist()
+    to_del = list(set(to_del))
     for index in sorted(to_del, reverse=True):
         del col_bounds[index]
     # seps1, seps2 = get_separator(boxes, vertical=0)
@@ -347,7 +348,7 @@ def merge_blocks(blocks, para_boxes, is_heading):
                             lb = next_col_bounds[l][0]
                         if next_col_bounds[l][2] > ub:
                             ub = next_col_bounds[l][2]
-            if und_cols == n_cols[j + 1]:  # todo: revisit this
+            if und_cols == n_cols[j + 1]:
                 if next_head == 1:
                     ss = sum(is_heading[idx[0][0]+1:])
                     if ss > 0:
@@ -566,11 +567,10 @@ def create_order2(blocks, boxes, img):
         # img_draw = draw_boxes(img, [block], (0, 255, 0))
         for left, right in zip(seps_l, seps_r):
             col_block = [left, block[1], right, block[3]]
-            # img_draw = draw_boxes(img, [col_block])
-            # cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
-            # cv2.waitKey()
+            img_draw = draw_boxes(img, [col_block])
+            cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
+            cv2.waitKey()
             col_boxes = get_block_para(col_block, block_boxes, eps=3)
-            print()
             col_boxes = col_boxes[np.argsort(col_boxes[:, 1])]
             boxes_out.extend(col_boxes.tolist())
     return boxes_out
