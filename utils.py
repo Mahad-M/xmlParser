@@ -335,23 +335,16 @@ def merge_blocks(blocks, para_boxes, is_heading):
                 working_bounds = []
                 break
 
-            und_cols = 0
-            for k in range(0, len(working_bounds)):
-                lb = np.amin(working_bounds[k][0])
-                ub = np.amax(working_bounds[k][2])
-                for l in range(0, len(next_col_bounds)):
-                    if np.logical_and(next_col_bounds[l][0] >= lb - 0.07 * page_width,
-                                      next_col_bounds[l][2] <= ub + 0.07 * page_height):
-
-                        und_cols += 1
-                        if next_col_bounds[l][0] < lb:
-                            lb = next_col_bounds[l][0]
-                        if next_col_bounds[l][2] > ub:
-                            ub = next_col_bounds[l][2]
+            und_cols = under_cols(working_bounds, next_col_bounds, page_height, page_width)
             if und_cols == n_cols[j + 1]:
                 if next_head == 1:
+                    next_next_block = blocks[j+2]
+                    next_next_boxes = get_block_para(next_next_block.tolist(), para_boxes, eps=15)
+                    next_next_cols = get_col_bounds(next_next_boxes, page_width)
+                    und_cols2 = under_cols(working_bounds, next_next_cols, page_height, page_width)
                     ss = sum(is_heading[idx[0][0]+1:])
-                    if ss > 0:
+                    if und_cols2 == n_cols[j+2]:
+                    # if ss > 0:
                         n_cols[j + 1] = n_cols[j]
                     else:
                         break
@@ -519,13 +512,28 @@ def update_col_bounds(bounds1, bounds2):
     return out
 
 
-def lies_under(bounds1, bounds2, eps=85):
-    bounds1 = np.array(bounds1)
-    bounds2 = np.array(bounds2)
-    for i in range(0, len(bounds1)):
-        if (bounds2[0] >= bounds1[i, 0] - eps) and (bounds2[2] <= bounds1[i, 2] + eps):
-            return i
-    return -1
+def under_cols(working_bounds, next_col_bounds, page_height, page_width):
+    """
+    :param working_bounds: list
+    :param next_col_bounds: list
+    :param page_height: int
+    :param page_width: int
+    :return: und_cols (number of underlying columns)
+    """
+    und_cols = 0
+    for k in range(0, len(working_bounds)):
+        lb = np.amin(working_bounds[k][0])
+        ub = np.amax(working_bounds[k][2])
+        for l in range(0, len(next_col_bounds)):
+            if np.logical_and(next_col_bounds[l][0] >= lb - 0.07 * page_width,
+                              next_col_bounds[l][2] <= ub + 0.07 * page_height):
+
+                und_cols += 1
+                if next_col_bounds[l][0] < lb:
+                    lb = next_col_bounds[l][0]
+                if next_col_bounds[l][2] > ub:
+                    ub = next_col_bounds[l][2]
+    return und_cols
 
 
 def create_order(blocks, boxes):
@@ -567,9 +575,9 @@ def create_order2(blocks, boxes, img):
         # img_draw = draw_boxes(img, [block], (0, 255, 0))
         for left, right in zip(seps_l, seps_r):
             col_block = [left, block[1], right, block[3]]
-            img_draw = draw_boxes(img, [col_block])
-            cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
-            cv2.waitKey()
+            # img_draw = draw_boxes(img, [col_block])
+            # cv2.imshow('', cv2.resize(img_draw, fx=0.25, fy=0.25, dsize=None))
+            # cv2.waitKey()
             col_boxes = get_block_para(col_block, block_boxes, eps=3)
             col_boxes = col_boxes[np.argsort(col_boxes[:, 1])]
             boxes_out.extend(col_boxes.tolist())
