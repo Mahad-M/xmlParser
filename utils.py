@@ -338,13 +338,16 @@ def merge_blocks(blocks, para_boxes, is_heading):
             und_cols = under_cols(working_bounds, next_col_bounds, page_height, page_width)
             if und_cols == n_cols[j + 1]:
                 if next_head == 1:
-                    next_next_block = blocks[j+2]
-                    next_next_boxes = get_block_para(next_next_block.tolist(), para_boxes, eps=15)
-                    next_next_cols = get_col_bounds(next_next_boxes, page_width)
-                    und_cols2 = under_cols(working_bounds, next_next_cols, page_height, page_width)
-                    ss = sum(is_heading[idx[0][0]+1:])
-                    if und_cols2 == n_cols[j+2]:
-                    # if ss > 0:
+                    try:
+                        next_next_block = blocks[j + 2]
+                        next_next_boxes = get_block_para(next_next_block.tolist(), para_boxes, eps=15)
+                        next_next_cols = get_col_bounds(next_next_boxes, page_width)
+                        und_cols2 = under_cols(working_bounds, next_next_cols, page_height, page_width)
+                        ss = sum(is_heading[idx[0][0] + 1:])
+                    except IndexError:
+                        continue
+                    if und_cols2 == n_cols[j + 2]:
+                        # if ss > 0:
                         n_cols[j + 1] = n_cols[j]
                     else:
                         break
@@ -582,6 +585,23 @@ def create_order2(blocks, boxes, img):
             col_boxes = col_boxes[np.argsort(col_boxes[:, 1])]
             boxes_out.extend(col_boxes.tolist())
     return boxes_out
+
+
+def order(boxes, out):
+    tops, bottoms = get_separator(boxes, vertical=1)
+    if not isinstance(boxes, np.ndarray):
+        boxes = np.array(boxes)
+    for top, bottom in zip(tops, bottoms):
+        block_boxes = boxes[np.logical_and(boxes[:, 1] >= top, boxes[:, 3] <= bottom)]
+        lefts, rights = get_separator(block_boxes, vertical=0)  # get columns
+        if len(lefts) == 1 and len(tops) == 1:  # if there is only one row and one column in the block
+            col_boxes = block_boxes[np.logical_and(block_boxes[:, 0] >= lefts[0], block_boxes[:, 2] <= rights[0])]
+            out.extend(col_boxes.tolist())
+        else:
+            for left, right in zip(lefts, rights):
+                col_boxes = block_boxes[np.logical_and(block_boxes[:, 0] >= left, block_boxes[:, 2] <= right)]
+                order(col_boxes, out)
+    return out
 
 
 def find_runs(x):
