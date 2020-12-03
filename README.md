@@ -1,5 +1,5 @@
 # xmlParser
-DISCALIMER: This is a project under development and may not be considered an end product!
+**DISCLAIMER: This is a project under development and may not be considered an end product!**
 
 
 This repo assumes that you have the paragraph level bounding boxes and their corresponding texts. In case of tables, you must have the cell boundaries, cell texts, and cell organization in rows. This parser is written for ABBYY xml output and assumes the input in the same format. However, some portion of it is also being developed to work with AiXprt's Digital PDF parser and can work with their dataframes.
